@@ -14,16 +14,25 @@
 
 [package]
 name = "agones"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2018"
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
-openssl = ["grpcio/openssl"]
-openssl-vendored = ["grpcio/openssl-vendored"]
+default = ["sdk", "client", "allocation"]
+sdk = []
+allocation = []
+alpha = []
+beta = []
+client = []
+server = []
 
 [dependencies]
-grpcio = "0.6.0"
-protobuf = "2.16.2"
-futures = { version = "0.3", features = ["compat"] }
-futures01 = "0.1"
-error-chain = "0.12.3"
+tonic = "0.4.2"
+prost = "0.7.0"
+prost-types = "0.7.0"
+
+[build-dependencies]
+tonic-build = "0.4.2"
