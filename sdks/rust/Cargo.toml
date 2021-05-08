@@ -21,18 +21,19 @@ edition = "2018"
 all-features = true
 
 [features]
-default = ["sdk", "client", "allocation"]
+default = ["sdk", "client", "allocation", "transport"]
 sdk = []
 allocation = []
 alpha = []
 beta = []
 client = []
 server = []
+transport = ["tonic/transport", "tonic-build/transport"]
 
 [dependencies]
-tonic = "0.4.2"
+tonic = { version = "0.4.2", default-features = false }
 prost = "0.7.0"
 prost-types = "0.7.0"
 
 [build-dependencies]
-tonic-build = "0.4.2"
+tonic-build = { version = "0.4.2", default-features = false }

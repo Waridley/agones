@@ -43,35 +43,79 @@ pub mod sdk {
 	
 	use tonic::{
 		Response, Status, IntoRequest,
-		codegen::StdError,
-		transport::{Channel, Endpoint, Error,}
+		body::Body,
+		codegen::{StdError, HttpBody, },
+		transport::{Channel, Endpoint,}
 	};
 	
-	pub struct Sdk {
-		#[cfg(feature = "sdk")]
-		stable: SdkClient<Channel>,
+	#[cfg(feature = "sdk")]
+	pub struct Sdk<T> {
+		stable: SdkClient<T>,
 		#[cfg(feature = "alpha")]
-		alpha: alpha::sdk_client::SdkClient<Channel>,
+		alpha: alpha::sdk_client::SdkClient<T>,
 	}
 	
-	impl Sdk {
-		pub fn new<D>(dst: D) -> Result<Self, tonic::transport::Error>
+	#[cfg(all(feature = "sdk", feature = "alpha"))]
+	impl<T> Sdk<T> {
+		pub async fn alpha(&mut self) -> &mut alpha::sdk_client::SdkClient<T> {
+			&mut self.alpha
+		}
+	}
+	
+	#[cfg(all(feature = "sdk", feature = "transport"))]
+	impl Sdk<Channel> {
+		pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
 		where
 			D: std::convert::TryInto<tonic::transport::Endpoint>,
 			D::Error: Into<StdError>,
 		{
-			let conn = Endpoint::new(dst)?.connect_lazy()?;
-			Ok(Sdk {
-				#[cfg(feature = "sdk")]
-				stable: SdkClient::new(conn.clone()),
-				#[cfg(feature = "alpha")]
-				alpha: alpha::sdk_client::SdkClient::new(conn),
-			})
+			let chan = Endpoint::new(dst)?.connect().await?;
+			
+			Ok(Self::new(chan))
+		}
+		
+		pub fn connect_lazy<D>(dst: D) -> Result<Self, tonic::transport::Error>
+		where
+			D: std::convert::TryInto<tonic::transport::Endpoint>,
+			D::Error: Into<StdError>,
+		{
+			let chan = Endpoint::new(dst)?.connect_lazy()?;
+			
+			Ok(Self::new(chan))
 		}
 	}
 	
 	#[cfg(feature = "sdk")]
-	impl Sdk {
+	impl<T> Sdk<T>
+	where
+		T: tonic::client::GrpcService<tonic::body::BoxBody>,
+		T::ResponseBody: Body + HttpBody + Send + 'static,
+		T::Error: Into<StdError>,
+		<T::ResponseBody as HttpBody>::Error: Into<StdError> + Send,
+	{
+		#[cfg(not(feature = "alpha"))]
+		pub fn new(inner: T) -> Self {
+			Self {
+				stable: SdkClient::new(inner),
+			}
+		}
+		
+		#[cfg(feature = "alpha")]
+		pub fn new(inner: T) -> Self where T: Clone {
+			Self {
+				alpha: alpha::sdk_client::SdkClient::new(inner.clone()),
+				stable: SdkClient::new(inner),
+			}
+		}
+		
+		#[cfg(feature = "alpha")]
+		pub fn from_connectors(stable: T, alpha: T) -> Self {
+			Self {
+				stable: SdkClient::new(stable),
+				alpha: alpha::sdk_client::SdkClient::new(alpha)
+			}
+		}
+		
 		/// Call when the GameServer is ready
 		pub async fn ready(
 			&mut self,
@@ -113,30 +157,6 @@ pub mod sdk {
 			request: impl tonic::IntoRequest<Duration>,
 		) -> Result<Response<Empty>, Status> {
 			self.stable.reserve(request).await
-		}
-	}
-	
-	#[cfg(feature = "alpha")]
-	impl Sdk {
-		pub async fn set_player_capacity(
-			&mut self,
-			request: impl tonic::IntoRequest<alpha::Count>,
-		) -> Result<Response<alpha::Empty>, Status> {
-			self.alpha.set_player_capacity(request).await
-		}
-		
-		pub async fn player_connect(
-			&mut self,
-			request: impl tonic::IntoRequest<alpha::PlayerId>,
-		) -> Result<Response<alpha::Bool>, Status> {
-			self.alpha.player_connect(request).await
-		}
-		
-		pub async fn player_disconnect(
-			&mut self,
-			request: impl tonic::IntoRequest<alpha::PlayerId>,
-		) -> Result<Response<alpha::Bool>, Status> {
-			self.alpha.player_disconnect(request).await
 		}
 	}
 }
