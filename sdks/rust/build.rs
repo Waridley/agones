@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	
 	//TODO: There's probably a better way to parse the proto files to find the includes
 	let rs_incl_dir = PathBuf::from(var("OUT_DIR").unwrap()).join("includes");
-	std::fs::create_dir_all(&rs_incl_dir);
+	std::fs::create_dir_all(&rs_incl_dir)?;
 	for path in protos {
 		File::open(&path)
 			.and_then(|proto_file| {
