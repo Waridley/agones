@@ -42,24 +42,41 @@ pub mod sdk {
 	use crate::proto::alpha;
 	
 	use tonic::{
-		Response, Status, IntoRequest,
+		Response, Status,
 		body::Body,
 		codegen::{StdError, HttpBody, },
 		transport::{Channel, Endpoint,}
 	};
 	use std::net::{Ipv6Addr, Ipv4Addr, SocketAddrV6, SocketAddrV4};
 	use tonic::codegen::http::uri::{Builder as UriBuilder, Scheme};
+	use tokio_stream::StreamExt;
+	use std::ops::{Deref, DerefMut};
 	
 	#[cfg(feature = "sdk")]
+	#[derive(Clone)]
 	pub struct Sdk<T> {
 		stable: SdkClient<T>,
 		#[cfg(feature = "alpha")]
 		alpha: alpha::sdk_client::SdkClient<T>,
 	}
 	
+	impl<T> Deref for Sdk<T> {
+		type Target = SdkClient<T>;
+		
+		fn deref(&self) -> &Self::Target {
+			&self.stable
+		}
+	}
+	
+	impl<T> DerefMut for Sdk<T> {
+		fn deref_mut(&mut self) -> &mut Self::Target {
+			&mut self.stable
+		}
+	}
+	
 	#[cfg(all(feature = "sdk", feature = "alpha"))]
 	impl<T> Sdk<T> {
-		pub async fn alpha(&mut self) -> &mut alpha::sdk_client::SdkClient<T> {
+		pub fn alpha(&mut self) -> &mut alpha::sdk_client::SdkClient<T> {
 			&mut self.alpha
 		}
 	}
@@ -117,6 +134,15 @@ pub mod sdk {
 		pub async fn default_v6() -> Result<Self, tonic::transport::Error> {
 			Self::new_v6(9357).await
 		}
+		
+		pub async fn health(&mut self) -> Result<Response<Empty>, Status> {
+			use tokio::time::{interval, Duration};
+			
+			let dur = interval(Duration::from_secs(10));
+			let stream = tokio_stream::wrappers::IntervalStream::new(dur)
+				.map(|_| Empty {});
+			self.stable.health(stream).await
+		}
 	}
 	
 	#[cfg(feature = "sdk")]
@@ -151,18 +177,12 @@ pub mod sdk {
 		}
 		
 		/// Call when the GameServer is ready
-		pub async fn ready(
-			&mut self,
-			request: impl IntoRequest<Empty>,
-		) -> Result<Response<Empty>, Status> {
-			self.stable.ready(request).await
+		pub async fn ready(&mut self) -> Result<Response<Empty>, Status> {
+			self.stable.ready(Empty {}).await
 		}
 		
-		pub async fn shutdown(
-			&mut self,
-			request: impl IntoRequest<Empty>,
-		) -> Result<Response<Empty>, Status> {
-			self.stable.shutdown(request).await
+		pub async fn shutdown(&mut self) -> Result<Response<Empty>, Status> {
+			self.stable.shutdown(Empty {}).await
 		}
 		
 		pub async fn set_label(
@@ -172,25 +192,19 @@ pub mod sdk {
 			self.stable.set_label(request).await
 		}
 		
-		pub async fn set_annotation(
-			&mut self,
-			request: impl tonic::IntoRequest<KeyValue>,
-		) -> Result<Response<Empty>, Status> {
-			self.stable.set_annotation(request).await
+		pub async fn set_annotation(&mut self, key: impl ToString, value: impl ToString) -> Result<Response<Empty>, Status> {
+			self.stable.set_annotation(KeyValue {
+				key: key.to_string(),
+				value: value.to_string()
+			}).await
 		}
 		
-		pub async fn allocate(
-			&mut self,
-			request: impl tonic::IntoRequest<Empty>,
-		) -> Result<Response<Empty>, Status> {
-			self.stable.allocate(request).await
+		pub async fn allocate(&mut self) -> Result<Response<Empty>, Status> {
+			self.stable.allocate(Empty {}).await
 		}
 		
-		pub async fn reserve(
-			&mut self,
-			request: impl tonic::IntoRequest<Duration>,
-		) -> Result<Response<Empty>, Status> {
-			self.stable.reserve(request).await
+		pub async fn reserve(&mut self, seconds: i64) -> Result<Response<Empty>, Status> {
+			self.stable.reserve(Duration { seconds }).await
 		}
 	}
 }
