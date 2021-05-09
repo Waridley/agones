@@ -47,6 +47,8 @@ pub mod sdk {
 		codegen::{StdError, HttpBody, },
 		transport::{Channel, Endpoint,}
 	};
+	use std::net::{Ipv6Addr, Ipv4Addr, SocketAddrV6, SocketAddrV4};
+	use tonic::codegen::http::uri::{Builder as UriBuilder, Scheme};
 	
 	#[cfg(feature = "sdk")]
 	pub struct Sdk<T> {
@@ -82,6 +84,38 @@ pub mod sdk {
 			let chan = Endpoint::new(dst)?.connect_lazy()?;
 			
 			Ok(Self::new(chan))
+		}
+		
+		pub async fn new_v4(port: u16) -> Result<Self, tonic::transport::Error> {
+			Self::connect(UriBuilder::new()
+				.scheme(Scheme::HTTP)
+				.authority(
+					&*SocketAddrV4::new(Ipv4Addr::LOCALHOST, port).to_string()
+				)
+				.path_and_query("")
+				.build()
+				.unwrap()
+			).await
+		}
+		
+		pub async fn new_v6(port: u16) -> Result<Self, tonic::transport::Error> {
+			Self::connect(UriBuilder::new()
+				.scheme(Scheme::HTTP)
+				.authority(
+					&*SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0).to_string()
+				)
+				.path_and_query("")
+				.build()
+				.unwrap()
+			).await
+		}
+		
+		pub async fn default_v4() -> Result<Self, tonic::transport::Error> {
+			Self::new_v4(9357).await
+		}
+		
+		pub async fn default_v6() -> Result<Self, tonic::transport::Error> {
+			Self::new_v6(9357).await
 		}
 	}
 	
