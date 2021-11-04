@@ -6,7 +6,6 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
 	println!("cargo:rerun-if-changed=../../proto");
 	println!("cargo:rerun-if-changed=build.rs");
-	println!("cargo:rerun-if-changed={}", var("OUT_DIR").unwrap());
 	
 	let mut builder = tonic_build::configure();
 	
